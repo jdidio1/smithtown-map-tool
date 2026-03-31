@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+
+<title>Suffolk County Distance Map</title>
+
+<meta charset="utf-8"/>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+
+@media print {
+.letter-marker,
+.markerA,
+.markerB,
+.markerC,
+.markerD {
+-webkit-print-color-adjust: exact;
+print-color-adjust: exact;
+}
+}
+
+body{
+font-family:Arial;
+margin:20px;
+}
+
+#topRow{
+display:flex;
+gap:20px;
+}
+
+#controls{
+width:300px;
+}
+
+#map{
+flex:1;
+height:600px;
+}
+
+input{
+width:260px;
+padding:4px;
+margin-bottom:5px;
+}
+
+button{
+margin-top:5px;
+margin-right:5px;
+padding:6px 10px;
+}
+
+.distance-list{
+margin-top:10px;
+}
+
+.letter-marker{
+border:2px solid black;
+border-radius:12px;
+width:24px;
+height:24px;
+text-align:center;
+line-height:24px;
+font-weight:bold;
+color:black;
+}
+
+.markerA{background:yellow;}
+.markerB{background:red;color:white;}
+.markerC{background:blue;color:white;}
+.markerD{background:green;color:white;}
+
+#streetSection{
+margin-top:20px;
+}
+
+#streetViewContainer{
+display:flex;
+gap:10px;
+}
+
+.streetBox{
+flex:1;
+}
+
+.streetBox iframe{
+width:100%;
+height:200px;
+border:1px solid #ccc;
+}
+
+.streetBox a{
+font-size:12px;
+display:block;
+margin-bottom:4px;
+}
+
+@media print{
+button,
+#zoomSlider{
+display:none;
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Suffolk County Distance Map</h2>
+
+<div id="topRow">
+
+<div id="controls">
+
+<label>Address A, SUBJECT</label><br> <input id="addrA" placeholder="Subject"><br>
+
+<label>Address B, COMP 1</label><br> <input id="addrB" placeholder="Comp 1"><br>
+
+<label>Address C, COMP 2</label><br> <input id="addrC" placeholder="Comp 2"><br>
+
+<label>Address D, COMP 3</label><br> <input id="addrD" placeholder="Comp 3"><br>
+
+<button onclick="drawDrivingRoutes()">Draw Driving Routes</button> <button onclick="drawStraightLines()">Draw Straight Lines</button> <button onclick="showStreetViews()">Show Google Street Views</button> <button onclick="clearAddresses()">Clear Addresses</button>
+
+<br><br>
+
+<label><b>Map Zoom</b></label><br>
+
+<input type="range"
+id="zoomSlider"
+min="9"
+max="18"
+step="0.1"
+value="11"
+oninput="updateZoom(this.value)">
+
+<span id="zoomValue">11</span>
+
+<div class="distance-list">
+
+<h3>Distances</h3>
+
+<ul id="distances">
+<li style="color:red;">A → B: --</li>
+<li style="color:blue;">A → C: --</li>
+<li style="color:green;">A → D: --</li>
+</ul>
+
+</div>
+
+</div>
+
+<div id="map"></div>
+
+</div>
+
+<div id="streetSection">
+
+<h3>Google Street View Comparisons</h3>
+
+<div id="streetViewContainer"></div>
+
+</div>
+
+<script>
+
+/* MAP */
+
+var map=L.map('map',{
+center:[40.87,-72.9],
+zoom:11,
+zoomSnap:0.1,
+zoomDelta:0.1,
+minZoom:9,
+maxZoom:19
+});
+
+L.tileLayer(
+'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+{maxZoom:19}
+).addTo(map);
+
+var colors=['red','blue','green'];
+
+/* SLEEP HELPER */
+
+function sleep(ms){
+return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+/* CLEAR MAP */
+
+function clearMapLayers(){
+
+map.eachLayer(layer=>{
+if(layer instanceof L.Marker || layer instanceof L.Polyline){
+map.removeLayer(layer);
+}
+});
+
+}
+
+/* GEOCODE */
+
+async function geocode(address){
+
+address = address + ", Suffolk County NY";
+
+const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+
+try{
+
+const response=await fetch(url,{
+headers:{
+"Accept":"application/json"
+}
+});
+
+const data=await response.json();
+
+if(!data || data.length===0){
+alert("Address not found: " + address);
+return null;
+}
+
+return[
+parseFloat(data[0].lat),
+parseFloat(data[0].lon)
+];
+
+}catch(e){
+alert("Geocoding error.");
+return null;
+}
+
+}
+
+/* MARKERS */
+
+function addMarker(lat,lon,label){
+
+let colorClass="marker"+label;
+
+L.marker(
+[lat,lon],
+{
+icon:L.divIcon({
+className:`letter-marker ${colorClass}`,
+html:`<b>${label}</b>`,
+iconSize:[24,24],
+iconAnchor:[12,12]
+})
+}
+).addTo(map);
+
+}
+
+/* DISTANCE */
+
+function metersToMiles(m){
+return (m*0.000621371).toFixed(2);
+}
+
+/* GET COORDS SAFELY */
+
+async function getCoords(){
+
+let addresses=[
+document.getElementById('addrA').value,
+document.getElementById('addrB').value,
+document.getElementById('addrC').value,
+document.getElementById('addrD').value
+];
+
+let coords=[];
+
+for(let addr of addresses){
+
+if(!addr){
+coords.push(null);
+continue;
+}
+
+let result=await geocode(addr);
+
+coords.push(result);
+
+}
+
+return coords;
+
+}
+
+/* DRIVING ROUTES */
+
+async function drawDrivingRoutes(){
+
+clearMapLayers();
+
+let coords=await getCoords();
+
+if(!coords[0]){
+alert("Subject address required.");
+return;
+}
+
+let subject=coords[0];
+
+addMarker(subject[0],subject[1],'A');
+
+for(let i=1;i<coords.length;i++){
+
+if(!coords[i]) continue;
+
+let dest=coords[i];
+
+addMarker(dest[0],dest[1],String.fromCharCode(65+i));
+
+let url=`https://router.project-osrm.org/route/v1/driving/${subject[1]},${subject[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson`;
+
+let response=await fetch(url);
+let data=await response.json();
+
+if(data.routes.length>0){
+
+let route=data.routes[0];
+
+let coordsLine=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+
+L.polyline(coordsLine,{
+color:colors[i-1],
+weight:4
+}).addTo(map);
+
+document.getElementById('distances').children[i-1].textContent=
+`A → ${String.fromCharCode(65+i)}: ${metersToMiles(route.distance)} mi`;
+
+}
+
+await sleep(500);
+
+}
+
+}
+
+/* STRAIGHT LINES */
+
+async function drawStraightLines(){
+
+clearMapLayers();
+
+let coords=await getCoords();
+
+if(!coords[0]){
+alert("Subject address required.");
+return;
+}
+
+let subject=coords[0];
+
+addMarker(subject[0],subject[1],'A');
+
+for(let i=1;i<coords.length;i++){
+
+if(!coords[i]) continue;
+
+let dest=coords[i];
+
+addMarker(dest[0],dest[1],String.fromCharCode(65+i));
+
+L.polyline(
+[subject,dest],
+{
+color:colors[i-1],
+dashArray:'5,5'
+}
+).addTo(map);
+
+let dist=map.distance(subject,dest);
+
+document.getElementById('distances').children[i-1].textContent=
+`A → ${String.fromCharCode(65+i)}: ${metersToMiles(dist)} mi`;
+
+}
+
+}
+
+/* STREET VIEWS */
+
+function showStreetViews(){
+
+let addresses=[
+document.getElementById('addrA').value,
+document.getElementById('addrB').value,
+document.getElementById('addrC').value,
+document.getElementById('addrD').value
+];
+
+let labels=["Subject","Comp 1","Comp 2","Comp 3"];
+
+let container=document.getElementById('streetViewContainer');
+
+container.innerHTML="";
+
+addresses.forEach((addr,i)=>{
+
+if(!addr) return;
+
+let box=document.createElement("div");
+box.className="streetBox";
+
+let title=document.createElement("div");
+title.innerHTML=`<b>${labels[i]}</b>`;
+
+let link=document.createElement("a");
+link.href=`https://www.google.com/maps/search/${encodeURIComponent(addr)}`;
+link.target="_blank";
+link.innerText="Open in Google Maps";
+
+let iframe=document.createElement("iframe");
+
+iframe.src=`https://maps.google.com/maps?q=${encodeURIComponent(addr)}&layer=c&output=embed`;
+
+box.appendChild(title);
+box.appendChild(link);
+box.appendChild(iframe);
+
+container.appendChild(box);
+
+});
+
+}
+
+/* CLEAR */
+
+function clearAddresses(){
+
+['addrA','addrB','addrC','addrD'].forEach(id=>{
+document.getElementById(id).value="";
+});
+
+document.getElementById('streetViewContainer').innerHTML="";
+
+document.getElementById('distances').innerHTML=`
+<li style="color:red;">A → B: --</li>
+<li style="color:blue;">A → C: --</li>
+<li style="color:green;">A → D: --</li>
+`;
+
+clearMapLayers();
+
+}
+
+/* ZOOM */
+
+function updateZoom(value){
+
+map.setZoom(parseFloat(value));
+
+document.getElementById("zoomValue").innerText=value;
+
+}
+
+</script>
+
+</body>
+</html>
