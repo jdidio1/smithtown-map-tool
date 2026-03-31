@@ -304,49 +304,45 @@ async function drawDrivingRoutes(){
 
 clearMapLayers();
 
-let coords=await getCoords();
+let coords = await getCoords();
 
 if(!coords[0]){
 alert("Subject address required.");
 return;
 }
 
-let subject=coords[0];
+let subject = coords[0];
 
 addMarker(subject[0],subject[1],'A');
 
-for(let i=1;i<coords.length;i++){
+let destinations = coords.slice(1).filter(c=>c);
 
-if(!coords[i]) continue;
+destinations.forEach((dest,i)=>{
+addMarker(dest[0],dest[1],String.fromCharCode(66+i));
+});
 
-let dest=coords[i];
+let coordString = destinations
+.map(d=>`${d[1]},${d[0]}`)
+.join(';');
 
-addMarker(dest[0],dest[1],String.fromCharCode(65+i));
+let url=`https://api.allorigins.win/raw?url=https://router.project-osrm.org/route/v1/driving/${subject[1]},${subject[0]};${coordString}?overview=full&geometries=geojson&steps=false`;
 
-let url=`https://api.allorigins.win/raw?url=https://router.project-osrm.org/route/v1/driving/${subject[1]},${subject[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson`;
+let response = await fetch(url);
+let data = await response.json();
 
-let response=await fetch(url);
-let data=await response.json();
+data.routes.forEach((route,i)=>{
 
-if(data.routes.length>0){
-
-let route=data.routes[0];
-
-let coordsLine=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+let coordsLine = route.geometry.coordinates.map(c=>[c[1],c[0]]);
 
 L.polyline(coordsLine,{
-color:colors[i-1],
+color:colors[i],
 weight:4
 }).addTo(map);
 
-document.getElementById('distances').children[i-1].textContent=
-`A → ${String.fromCharCode(65+i)}: ${metersToMiles(route.distance)} mi`;
+document.getElementById('distances').children[i].textContent=
+`A → ${String.fromCharCode(66+i)}: ${metersToMiles(route.distance)} mi`;
 
-}
-
-await sleep(500);
-
-}
+});
 
 }
 
