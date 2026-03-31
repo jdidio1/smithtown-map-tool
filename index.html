@@ -325,10 +325,37 @@ let coordString = destinations
 .map(d=>`${d[1]},${d[0]}`)
 .join(';');
 
-let url=`https://api.allorigins.win/raw?url=https://router.project-osrm.org/route/v1/driving/${subject[1]},${subject[0]};${coordString}?overview=full&geometries=geojson&steps=false`;
+let url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
 
-let response = await fetch(url);
+let body = {
+  coordinates: [
+    [subject[1], subject[0]],
+    [dest[1], dest[0]]
+  ]
+};
+
+let response = await fetch(url, {
+  method: "POST",
+  headers: {
+    "Authorization": "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImYzNzM2Mzk0ZWNjMTRhN2E4ZWQ3YTU1ODlhNmU5NzYxIiwiaCI6Im11cm11cjY0In0=",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(body)
+});
+
 let data = await response.json();
+
+let coordsLine = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+
+L.polyline(coordsLine,{
+  color:colors[i-1],
+  weight:4
+}).addTo(map);
+
+let meters = data.features[0].properties.summary.distance;
+
+document.getElementById('distances').children[i-1].textContent =
+`A → ${String.fromCharCode(65+i)}: ${metersToMiles(meters)} mi`;
 
 data.routes.forEach((route,i)=>{
 
