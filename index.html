@@ -323,7 +323,7 @@ let dest=coords[i];
 
 addMarker(dest[0],dest[1],String.fromCharCode(65+i));
 
-let url=`https://corsproxy.io/?https://router.project-osrm.org/route/v1/driving/${subject[1]},${subject[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson`;
+let url=`https://api.allorigins.win/raw?url=https://router.project-osrm.org/route/v1/driving/${subject[1]},${subject[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson`;
 
 let response=await fetch(url);
 let data=await response.json();
