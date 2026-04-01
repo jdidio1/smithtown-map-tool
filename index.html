@@ -157,7 +157,10 @@ oninput="updateZoom(this.value)">
 
 </div>
 
-<div id="map"></div>
+<div id="mapContainer">
+  <div id="map"></div>
+  <img id="northArrow" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/North_arrow.svg/200px-North_arrow.svg.png">
+</div> 
 
 </div>
 
@@ -168,7 +171,17 @@ oninput="updateZoom(this.value)">
 <div id="streetViewContainer"></div>
 
 </div>
+#mapContainer{
+position:relative;
+}
 
+#northArrow{
+position:absolute;
+top:10px;
+left:10px;
+width:50px;
+z-index:1000;
+}
 <script>
 
 /* MAP */
@@ -247,7 +260,7 @@ return null;
 
 /* MARKERS */
 
-function addMarker(lat,lon,label){
+function addMarker(lat,lon,label,address=""){
 
 let colorClass="marker"+label;
 
@@ -256,8 +269,13 @@ L.marker(
 {
 icon:L.divIcon({
 className:`letter-marker ${colorClass}`,
-html:`<b>${label}</b>`,
-iconSize:[24,24],
+html:`<div style="text-align:center;">
+<b>${label}</b><br>
+<span style="font-size:10px;background:white;padding:2px;border-radius:3px;">
+${address}
+</span>
+</div>`,
+iconSize:[120,40],
 iconAnchor:[12,12]
 })
 }
@@ -316,7 +334,7 @@ return;
 
 let subject = coords[0];
 
-addMarker(subject[0],subject[1],'A');
+addMarker(subject[0],subject[1],'A',document.getElementById('addrA').value);
 
 for(let i=1;i<coords.length;i++){
 
@@ -324,7 +342,8 @@ if(!coords[i]) continue;
 
 let dest = coords[i];
 
-addMarker(dest[0],dest[1],String.fromCharCode(65+i));
+addMarker(dest[0],dest[1],String.fromCharCode(65+i),
+document.getElementById('addr'+String.fromCharCode(65+i)).value);
 
 let url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
 
