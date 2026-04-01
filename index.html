@@ -248,7 +248,7 @@ return null;
 
 /* MARKERS */
 
-function addMarker(lat,lon,label){
+function addMarker(lat,lon,label,address=""){
 
 let colorClass="marker"+label;
 
@@ -257,8 +257,15 @@ L.marker(
 {
 icon:L.divIcon({
 className:`letter-marker ${colorClass}`,
-html:`<b>${label}</b>`,
-iconSize:[24,24],
+html:`
+<div style="text-align:center;">
+<div class="letter-marker ${colorClass}">${label}</div>
+<div style="font-size:11px;background:white;padding:2px 4px;border-radius:3px;border:1px solid #999;">
+${address}
+</div>
+</div>
+`,
+iconSize:[120,40],
 iconAnchor:[12,12]
 })
 }
@@ -317,7 +324,7 @@ return;
 
 let subject = coords[0];
 
-addMarker(subject[0],subject[1],'A');
+addMarker(subject[0],subject[1],'A',document.getElementById('addrA').value);
 
 for(let i=1;i<coords.length;i++){
 
@@ -325,7 +332,8 @@ if(!coords[i]) continue;
 
 let dest = coords[i];
 
-addMarker(dest[0],dest[1],String.fromCharCode(65+i));
+addMarker(dest[0],dest[1],String.fromCharCode(65+i),
+document.getElementById('addr'+String.fromCharCode(65+i)).value);
 
 let url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
 
